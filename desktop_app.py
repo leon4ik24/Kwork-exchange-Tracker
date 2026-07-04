@@ -10,14 +10,13 @@ import webbrowser
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 
-# ==================== НАСТРОЙКИ ПО УМОЛЧАНИЮ ====================
 DEFAULT_KEYWORDS = "скрипт, парсер, python, бот, автоматизация, исправить, доработать, написать, база, api, php, yii, parser, script"
 DEFAULT_MIN_PRICE = 500
 DEFAULT_MAX_PRICE = 15000
-DEFAULT_INTERVAL = 5  # в минутах
+DEFAULT_INTERVAL = 5
 SENT_PROJECTS_FILE = "sent_projects.txt"
 SETTINGS_FILE = "kwork_settings.json"
-KWORK_URL = "https://kwork.ru/projects?c=11"  # "Разработка и IT"
+KWORK_URL = "https://kwork.ru/projects?c=11"
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
@@ -32,13 +31,12 @@ COLORS = {
     "accent2":   "#10a37f",
     "text":      "#eaeaea",
     "muted":     "#888888",
-    "high":      "#f0c040",   # подсветка дорогих заказов
-    "medium":    "#7ec8e3",   # средние заказы
+    "high":      "#f0c040",
+    "medium":    "#7ec8e3",
 }
 
 
 class ToastNotification(tk.Toplevel):
-    """Всплывающее окно уведомления"""
     def __init__(self, parent, title, price, url):
         super().__init__(parent)
         self.url = url
@@ -87,7 +85,6 @@ class ToastNotification(tk.Toplevel):
 
 
 class ProjectDetailWindow(tk.Toplevel):
-    """Окно с полным описанием проекта"""
     def __init__(self, parent, project):
         super().__init__(parent)
         self.title("Детали заказа")
@@ -95,12 +92,10 @@ class ProjectDetailWindow(tk.Toplevel):
         self.configure(bg=COLORS["bg"])
         self.attributes("-topmost", True)
 
-        # Заголовок
         tk.Label(self, text=project["title"], font=("Segoe UI", 12, "bold"),
                  fg=COLORS["accent"], bg=COLORS["bg"], wraplength=660, justify="left"
                  ).pack(anchor="w", padx=20, pady=(15, 5))
 
-        # Цена и ID
         info_frame = tk.Frame(self, bg=COLORS["bg"])
         info_frame.pack(anchor="w", padx=20, pady=(0, 10))
         price_fmt = f"{project['price']:,}".replace(",", " ")
@@ -111,7 +106,6 @@ class ProjectDetailWindow(tk.Toplevel):
                  font=("Segoe UI", 9), fg=COLORS["muted"],
                  bg=COLORS["bg"]).pack(side="left")
 
-        # Описание
         tk.Label(self, text="Описание:", font=("Segoe UI", 10, "bold"),
                  fg=COLORS["muted"], bg=COLORS["bg"]).pack(anchor="w", padx=20, pady=(0, 5))
 
@@ -130,7 +124,6 @@ class ProjectDetailWindow(tk.Toplevel):
         txt.insert("1.0", project["description"])
         txt.configure(state="disabled")
 
-        # Кнопки
         btn_row = tk.Frame(self, bg=COLORS["bg"])
         btn_row.pack(fill="x", padx=20, pady=(0, 15))
         tk.Button(btn_row, text="  Открыть в браузере  ",
@@ -168,10 +161,8 @@ class KworkMonitorApp(tk.Tk):
         self._create_widgets()
         self._load_settings()
 
-        # Сохранить настройки при закрытии
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
-    # ─── СТИЛИ ───────────────────────────────────────────────────────
     def _setup_styles(self):
         s = ttk.Style()
         s.theme_use("clam")
@@ -196,18 +187,15 @@ class KworkMonitorApp(tk.Tk):
         s.map("Treeview.Heading", background=[("active", COLORS["accent"])])
         s.configure("TSeparator", background=COLORS["card"])
 
-    # ─── ВИДЖЕТЫ ──────────────────────────────────────────────────────
     def _create_widgets(self):
         root_pad = ttk.Frame(self, padding="12")
         root_pad.pack(fill="both", expand=True)
 
-        # ── Шапка ──
         head_row = ttk.Frame(root_pad)
         head_row.pack(fill="x", pady=(0, 10))
         ttk.Label(head_row, text="KWORK TRACKER", style="Header.TLabel").pack(side="left")
         ttk.Label(head_row, text=" · Разработка и IT", style="Sub.TLabel").pack(side="left", pady=4)
 
-        # Счётчики справа
         stat_frame = tk.Frame(head_row, bg=COLORS["bg"])
         stat_frame.pack(side="right")
         self.lbl_stat_found = ttk.Label(stat_frame, text="Найдено: 0", style="Stat.TLabel")
@@ -219,14 +207,12 @@ class KworkMonitorApp(tk.Tk):
 
         ttk.Separator(root_pad, orient="horizontal").pack(fill="x", pady=(0, 10))
 
-        # ── Настройки ──
         sf = tk.LabelFrame(root_pad, text=" ⚙  Параметры ",
                            bg=COLORS["surface"], fg=COLORS["accent2"],
                            font=("Segoe UI", 9, "bold"),
                            bd=1, relief="groove", padx=10, pady=8)
         sf.pack(fill="x", pady=(0, 10))
 
-        # Ключевые слова
         r0 = tk.Frame(sf, bg=COLORS["surface"])
         r0.pack(fill="x", pady=3)
         tk.Label(r0, text="Ключевые слова:", width=20, anchor="w",
@@ -235,7 +221,6 @@ class KworkMonitorApp(tk.Tk):
         self.ent_keywords = ttk.Entry(r0, font=("Segoe UI", 9))
         self.ent_keywords.pack(side="left", fill="x", expand=True, padx=5)
 
-        # Цена + интервал
         r1 = tk.Frame(sf, bg=COLORS["surface"])
         r1.pack(fill="x", pady=3)
         tk.Label(r1, text="Цена от:", width=20, anchor="w",
@@ -252,7 +237,6 @@ class KworkMonitorApp(tk.Tk):
         self.ent_interval = ttk.Entry(r1, width=6, font=("Segoe UI", 9))
         self.ent_interval.pack(side="left", padx=5)
 
-        # Кнопки управления
         btn_row = tk.Frame(sf, bg=COLORS["surface"])
         btn_row.pack(fill="x", pady=(8, 2))
         self.btn_toggle = tk.Button(
@@ -282,7 +266,6 @@ class KworkMonitorApp(tk.Tk):
                   font=("Segoe UI", 9), relief="flat", bd=0, padx=12, pady=6
                   ).pack(side="right")
 
-        # ── Поиск по найденным ──
         search_row = tk.Frame(root_pad, bg=COLORS["bg"])
         search_row.pack(fill="x", pady=(0, 6))
         tk.Label(search_row, text="🔍 Фильтр по списку:", bg=COLORS["bg"],
@@ -291,7 +274,6 @@ class KworkMonitorApp(tk.Tk):
         self.ent_search.pack(side="left", padx=8)
         self.ent_search.bind("<KeyRelease>", self._on_search)
 
-        # ── Таблица результатов ──
         tree_frame = tk.Frame(root_pad, bg=COLORS["bg"])
         tree_frame.pack(fill="both", expand=True)
 
@@ -311,16 +293,14 @@ class KworkMonitorApp(tk.Tk):
         self.tree.pack(side="left", fill="both", expand=True)
         sb.pack(side="right", fill="y")
 
-        # Цветные теги строк
         self.tree.tag_configure("high",   foreground=COLORS["high"])
         self.tree.tag_configure("medium", foreground=COLORS["medium"])
         self.tree.tag_configure("normal", foreground=COLORS["text"])
 
         self.tree.bind("<Double-1>",  self._on_double_click)
         self.tree.bind("<Return>",    self._on_enter_key)
-        self.tree.bind("<Button-3>",  self._on_right_click)  # правая кнопка
+        self.tree.bind("<Button-3>",  self._on_right_click)
 
-        # Контекстное меню
         self.ctx_menu = tk.Menu(self, tearoff=0, bg=COLORS["surface"],
                                 fg=COLORS["text"], font=("Segoe UI", 9),
                                 activebackground=COLORS["card"],
@@ -331,7 +311,6 @@ class KworkMonitorApp(tk.Tk):
         self.ctx_menu.add_separator()
         self.ctx_menu.add_command(label="Удалить из списка", command=self._delete_selected)
 
-        # ── Статус-бар ──
         status_bar = tk.Frame(root_pad, bg=COLORS["bg"])
         status_bar.pack(fill="x", pady=(6, 0))
         self.lbl_status = tk.Label(
@@ -343,7 +322,6 @@ class KworkMonitorApp(tk.Tk):
                  bg=COLORS["bg"], fg=COLORS["card"],
                  font=("Segoe UI", 8)).pack(side="right")
 
-    # ─── НАСТРОЙКИ ────────────────────────────────────────────────────
     def _load_settings(self):
         defaults = {
             "keywords": DEFAULT_KEYWORDS,
@@ -381,7 +359,6 @@ class KworkMonitorApp(tk.Tk):
         self._save_settings()
         self.destroy()
 
-    # ─── БАЗА ОТПРАВЛЕННЫХ ────────────────────────────────────────────
     def _load_sent_projects(self):
         if os.path.exists(SENT_PROJECTS_FILE):
             try:
@@ -398,7 +375,6 @@ class KworkMonitorApp(tk.Tk):
         except Exception:
             pass
 
-    # ─── МОНИТОРИНГ ──────────────────────────────────────────────────
     def _toggle_monitoring(self):
         if self.is_monitoring:
             self._stop_monitoring()
@@ -430,7 +406,7 @@ class KworkMonitorApp(tk.Tk):
 
     def _stop_monitoring(self):
         self.is_monitoring = False
-        self._force_check_event.set()  # разблокируем sleep
+        self._force_check_event.set()
         self.btn_toggle.configure(text="▶  ЗАПУСТИТЬ", bg=COLORS["accent2"])
         self.btn_check_now.configure(state="disabled")
         self.lbl_status.configure(text="◼  Остановлен", fg=COLORS["muted"])
@@ -439,7 +415,6 @@ class KworkMonitorApp(tk.Tk):
             w.configure(state="normal")
 
     def _force_check(self):
-        """Немедленная проверка, не дожидаясь интервала"""
         self._force_check_event.set()
 
     def _monitor_loop(self):
@@ -494,7 +469,6 @@ class KworkMonitorApp(tk.Tk):
                 f"◉  Ожидание…  последняя проверка: {time.strftime('%H:%M:%S')}  "
                 f"(найдено: {self.stats['found']})", COLORS["accent2"])
 
-            # Спим интервал, но просыпаемся мгновенно при force-check или stop
             self._force_check_event.wait(timeout=interval * 60)
 
     def _parse_kwork(self):
@@ -509,7 +483,6 @@ class KworkMonitorApp(tk.Tk):
             self._set_status(f"⚠  Ошибка запроса: {e}", COLORS["accent"])
             return None
 
-    # ─── UI-ОБНОВЛЕНИЕ ────────────────────────────────────────────────
     def _set_status(self, text, color=None):
         self.after(0, lambda: self.lbl_status.configure(
             text=text, fg=color or COLORS["muted"]))
@@ -526,7 +499,6 @@ class KworkMonitorApp(tk.Tk):
             if not p:
                 continue
 
-            # Определяем цветовой тег
             if p["price"] >= 5000:
                 tag = ("high",   pid)
             elif p["price"] >= 2000:
@@ -540,20 +512,17 @@ class KworkMonitorApp(tk.Tk):
                                      p["title"], short_desc),
                              tags=tag)
 
-            # Уведомление + звук
             try:
                 winsound.MessageBeep(winsound.MB_ICONASTERISK)
             except Exception:
                 pass
             ToastNotification(self, p["title"], p["price"], p["url"])
 
-    # ─── ДЕЙСТВИЯ С ТАБЛИЦЕЙ ─────────────────────────────────────────
     def _get_selected_pid(self):
         sel = self.tree.selection()
         if not sel:
             return None
         tags = self.tree.item(sel[0], "tags")
-        # тег = ("high"/"medium"/"normal", pid)
         return tags[1] if len(tags) >= 2 else None
 
     def _on_double_click(self, _event):
@@ -599,19 +568,16 @@ class KworkMonitorApp(tk.Tk):
             for row in self.tree.get_children():
                 self.tree.delete(row)
 
-    # ─── ПОИСК ПО СПИСКУ ─────────────────────────────────────────────
     def _on_search(self, _event):
         query = self.ent_search.get().lower().strip()
         for row in self.tree.get_children():
             vals = self.tree.item(row, "values")
             text = " ".join(str(v) for v in vals).lower()
-            # Детач/аттач строк в зависимости от совпадения
             if query and query not in text:
                 self.tree.detach(row)
             else:
                 self.tree.reattach(row, "", 0)
 
-    # ─── ЭКСПОРТ CSV ─────────────────────────────────────────────────
     def _export_csv(self):
         rows = self.tree.get_children()
         if not rows:
