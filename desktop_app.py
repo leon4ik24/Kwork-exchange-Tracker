@@ -143,6 +143,186 @@ class ProjectDetailWindow(tk.Toplevel):
         messagebox.showinfo("Скопировано", "Ссылка скопирована в буфер обмена!")
 
 
+class AIGenerationWindow(tk.Toplevel):
+    def __init__(self, parent, project, calculated_price, api_key, model):
+        super().__init__(parent)
+        self.parent = parent
+        self.project = project
+        self.calculated_price = calculated_price
+        self.api_key = api_key
+        self.model = model
+
+        self.title("Генерация отклика с помощью Gemini ИИ")
+        self.geometry("750x650")
+        self.configure(bg=COLORS["bg"])
+        self.attributes("-topmost", True)
+
+        tk.Label(self, text=f"Заказ: {project['title']}", font=("Segoe UI", 11, "bold"),
+                 fg=COLORS["accent"], bg=COLORS["bg"], wraplength=710, justify="left"
+                 ).pack(anchor="w", padx=20, pady=(15, 5))
+
+        budget_frame = tk.Frame(self, bg=COLORS["bg"])
+        budget_frame.pack(anchor="w", padx=20, pady=(0, 10))
+        orig_price = f"{project['price']:,}".replace(",", " ")
+        calc_price = f"{calculated_price:,}".replace(",", " ")
+        tk.Label(budget_frame, text=f"💰 Бюджет: {orig_price} руб.", font=("Segoe UI", 9, "bold"),
+                 fg=COLORS["text"], bg=COLORS["bg"]).pack(side="left", padx=(0, 15))
+        tk.Label(budget_frame, text=f"🔥 Со скидкой: {calc_price} руб.", font=("Segoe UI", 9, "bold"),
+                 fg=COLORS["high"], bg=COLORS["bg"]).pack(side="left")
+
+        tk.Label(self, text="Описание проекта на Kwork:", font=("Segoe UI", 9, "bold"),
+                 fg=COLORS["muted"], bg=COLORS["bg"]).pack(anchor="w", padx=20, pady=(0, 3))
+
+        desc_frame = tk.Frame(self, bg=COLORS["surface"])
+        desc_frame.pack(fill="x", padx=20, pady=(0, 10))
+        desc_txt = tk.Text(desc_frame, wrap="word", font=("Segoe UI", 9),
+                           bg=COLORS["surface"], fg=COLORS["text"],
+                           relief="flat", padx=8, pady=8, height=6)
+        desc_sb = ttk.Scrollbar(desc_frame, command=desc_txt.yview)
+        desc_txt.configure(yscrollcommand=desc_sb.set)
+        desc_txt.pack(side="left", fill="both", expand=True)
+        desc_sb.pack(side="right", fill="y")
+        desc_txt.insert("1.0", project["description"])
+        desc_txt.configure(state="disabled")
+
+        tk.Label(self, text="Инструкция для ИИ (Промпт):", font=("Segoe UI", 9, "bold"),
+                 fg=COLORS["muted"], bg=COLORS["bg"]).pack(anchor="w", padx=20, pady=(0, 3))
+
+        prompt_frame = tk.Frame(self, bg=COLORS["surface"])
+        prompt_frame.pack(fill="x", padx=20, pady=(0, 10))
+        self.prompt_txt = tk.Text(prompt_frame, wrap="word", font=("Segoe UI", 9),
+                                 bg=COLORS["surface"], fg=COLORS["text"],
+                                 relief="flat", padx=8, pady=8, height=5)
+        self.prompt_txt.pack(fill="both", expand=True)
+
+        default_prompt = (
+            "Напиши короткий и убедительный отклик на этот заказ на бирже Kwork.\n"
+            "Правила отклика:\n"
+            "- Будь лаконичен (не более 3-4 предложений).\n"
+            "- БЕЗ раздела 'Как я реализую'.\n"
+            "- Формат: вежливое приветствие + короткое описание релевантного опыта + "
+            "что конкретно будет сделано (кратко) + призыв к действию / вопрос клиенту.\n"
+            "- Пиши естественно, от первого лица, избегай шаблонных фраз искусственного интеллекта."
+        )
+        self.prompt_txt.insert("1.0", default_prompt)
+
+        actions_row = tk.Frame(self, bg=COLORS["bg"])
+        actions_row.pack(fill="x", padx=20, pady=(0, 10))
+        self.btn_gen = tk.Button(actions_row, text=" ⚡  Сгенерировать отклик ",
+                                 command=self._generate,
+                                 bg=COLORS["accent2"], fg="white",
+                                 font=("Segoe UI", 10, "bold"), relief="flat", bd=0, padx=12, pady=6)
+        self.btn_gen.pack(side="left")
+
+        self.lbl_status = tk.Label(actions_row, text="", font=("Segoe UI", 9, "italic"),
+                                   fg=COLORS["high"], bg=COLORS["bg"])
+        self.lbl_status.pack(side="left", padx=15)
+
+        tk.Label(self, text="Сгенерированный отклик (можно редактировать здесь):", font=("Segoe UI", 9, "bold"),
+                 fg=COLORS["muted"], bg=COLORS["bg"]).pack(anchor="w", padx=20, pady=(0, 3))
+
+        result_frame = tk.Frame(self, bg=COLORS["surface"])
+        result_frame.pack(fill="both", expand=True, padx=20, pady=(0, 15))
+
+        self.result_txt = tk.Text(result_frame, wrap="word", font=("Segoe UI", 10),
+                                 bg=COLORS["surface"], fg=COLORS["text"],
+                                 relief="flat", padx=10, pady=10)
+        result_sb = ttk.Scrollbar(result_frame, command=self.result_txt.yview)
+        self.result_txt.configure(yscrollcommand=result_sb.set)
+        self.result_txt.pack(side="left", fill="both", expand=True)
+        result_sb.pack(side="right", fill="y")
+
+        btn_row = tk.Frame(self, bg=COLORS["bg"])
+        btn_row.pack(fill="x", padx=20, pady=(0, 15))
+
+        tk.Button(btn_row, text="  Скопировать текст и открыть Kwork  ",
+                  command=self._copy_and_open,
+                  bg=COLORS["accent"], fg="white",
+                  font=("Segoe UI", 10, "bold"), relief="flat", bd=0, padx=12, pady=6
+                  ).pack(side="left", padx=(0, 10))
+
+        tk.Button(btn_row, text="  Закрыть  ",
+                  command=self.destroy,
+                  bg=COLORS["card"], fg=COLORS["text"],
+                  font=("Segoe UI", 10), relief="flat", bd=0, padx=12, pady=6
+                  ).pack(side="left")
+
+    def _generate(self):
+        self.btn_gen.configure(state="disabled")
+        self.lbl_status.configure(text="Генерация отклика...")
+        self.update_idletasks()
+
+        threading.Thread(target=self._run_api_request, daemon=True).start()
+
+    def _run_api_request(self):
+        prompt_instructions = self.prompt_txt.get("1.0", "end-1c").strip()
+        project_title = self.project["title"]
+        project_desc = self.project["description"]
+
+        full_prompt = (
+            f"{prompt_instructions}\n\n"
+            f"Тема заказа: {project_title}\n"
+            f"Описание заказа:\n{project_desc}\n"
+        )
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent?key={self.api_key}"
+        headers = {"Content-Type": "application/json"}
+        payload = {
+            "contents": [
+                {
+                    "parts": [
+                        {
+                            "text": full_prompt
+                        }
+                    ]
+                }
+            ]
+        }
+
+        try:
+            r = requests.post(url, headers=headers, json=payload, timeout=30)
+            r.raise_for_status()
+            data = r.json()
+
+            candidates = data.get("candidates", [])
+            if candidates:
+                content = candidates[0].get("content", {})
+                parts = content.get("parts", [])
+                if parts:
+                    text = parts[0].get("text", "").strip()
+                else:
+                    text = "Ошибка: Пустой ответ от модели."
+            else:
+                text = f"Ошибка: Ответ API не содержит кандидатов.\n{json.dumps(data, indent=2)}"
+        except Exception as e:
+            text = f"Произошла ошибка при запросе к Gemini API:\n{e}"
+
+        self.after(0, self._display_result, text)
+
+    def _display_result(self, text):
+        if not self.winfo_exists():
+            return
+        self.btn_gen.configure(state="normal")
+        self.lbl_status.configure(text="Готово!")
+
+        self.result_txt.configure(state="normal")
+        self.result_txt.delete("1.0", "end")
+        self.result_txt.insert("1.0", text)
+
+    def _copy_and_open(self):
+        text = self.result_txt.get("1.0", "end-1c").strip()
+        if not text:
+            messagebox.showinfo("Инфо", "Сначала сгенерируйте отклик.")
+            return
+
+        self.clipboard_clear()
+        self.clipboard_append(text)
+
+        url = f"https://kwork.ru/new_offer?project={self.project['id']}"
+        webbrowser.open(url)
+        self.destroy()
+
+
 class KworkMonitorApp(tk.Tk):
     def __init__(self):
         super().__init__()
@@ -237,6 +417,24 @@ class KworkMonitorApp(tk.Tk):
         self.ent_interval = ttk.Entry(r1, width=6, font=("Segoe UI", 9))
         self.ent_interval.pack(side="left", padx=5)
 
+        r2 = tk.Frame(sf, bg=COLORS["surface"])
+        r2.pack(fill="x", pady=3)
+        tk.Label(r2, text="Gemini API Key:", width=20, anchor="w",
+                 bg=COLORS["surface"], fg=COLORS["muted"],
+                 font=("Segoe UI", 9)).pack(side="left")
+        self.ent_gemini_key = ttk.Entry(r2, font=("Segoe UI", 9), show="*")
+        self.ent_gemini_key.pack(side="left", fill="x", expand=True, padx=5)
+
+        tk.Label(r2, text="Модель:", bg=COLORS["surface"], fg=COLORS["muted"],
+                 font=("Segoe UI", 9)).pack(side="left")
+        self.ent_gemini_model = ttk.Entry(r2, width=15, font=("Segoe UI", 9))
+        self.ent_gemini_model.pack(side="left", padx=5)
+
+        tk.Label(r2, text="Скидка (%):", bg=COLORS["surface"], fg=COLORS["muted"],
+                 font=("Segoe UI", 9)).pack(side="left")
+        self.ent_discount = ttk.Entry(r2, width=4, font=("Segoe UI", 9))
+        self.ent_discount.pack(side="left", padx=5)
+
         btn_row = tk.Frame(sf, bg=COLORS["surface"])
         btn_row.pack(fill="x", pady=(8, 2))
         self.btn_toggle = tk.Button(
@@ -307,6 +505,7 @@ class KworkMonitorApp(tk.Tk):
                                 activeforeground=COLORS["accent"])
         self.ctx_menu.add_command(label="Открыть в браузере", command=self._open_selected)
         self.ctx_menu.add_command(label="Подробнее", command=self._show_detail)
+        self.ctx_menu.add_command(label="Генерировать отклик (ИИ)", command=self._generate_proposal_ai)
         self.ctx_menu.add_command(label="Скопировать ссылку", command=self._copy_link)
         self.ctx_menu.add_separator()
         self.ctx_menu.add_command(label="Удалить из списка", command=self._delete_selected)
@@ -328,6 +527,9 @@ class KworkMonitorApp(tk.Tk):
             "min_price": str(DEFAULT_MIN_PRICE),
             "max_price": str(DEFAULT_MAX_PRICE),
             "interval":  str(DEFAULT_INTERVAL),
+            "gemini_key": "",
+            "gemini_model": "gemini-1.5-flash",
+            "discount": "30",
         }
         if os.path.exists(SETTINGS_FILE):
             try:
@@ -341,6 +543,9 @@ class KworkMonitorApp(tk.Tk):
         self.ent_min_price.insert(0, defaults["min_price"])
         self.ent_max_price.insert(0, defaults["max_price"])
         self.ent_interval.insert(0, defaults["interval"])
+        self.ent_gemini_key.insert(0, defaults["gemini_key"])
+        self.ent_gemini_model.insert(0, defaults["gemini_model"])
+        self.ent_discount.insert(0, defaults["discount"])
 
     def _save_settings(self):
         data = {
@@ -348,6 +553,9 @@ class KworkMonitorApp(tk.Tk):
             "min_price": self.ent_min_price.get(),
             "max_price": self.ent_max_price.get(),
             "interval":  self.ent_interval.get(),
+            "gemini_key": self.ent_gemini_key.get(),
+            "gemini_model": self.ent_gemini_model.get(),
+            "discount": self.ent_discount.get(),
         }
         try:
             with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
@@ -398,7 +606,8 @@ class KworkMonitorApp(tk.Tk):
         self.btn_check_now.configure(state="normal")
         self.lbl_status.configure(text="◉  Работает…", fg=COLORS["accent2"])
 
-        for w in (self.ent_keywords, self.ent_min_price, self.ent_max_price, self.ent_interval):
+        for w in (self.ent_keywords, self.ent_min_price, self.ent_max_price, self.ent_interval,
+                  self.ent_gemini_key, self.ent_gemini_model, self.ent_discount):
             w.configure(state="disabled")
 
         self.monitor_thread = threading.Thread(target=self._monitor_loop, daemon=True)
@@ -411,7 +620,8 @@ class KworkMonitorApp(tk.Tk):
         self.btn_check_now.configure(state="disabled")
         self.lbl_status.configure(text="◼  Остановлен", fg=COLORS["muted"])
 
-        for w in (self.ent_keywords, self.ent_min_price, self.ent_max_price, self.ent_interval):
+        for w in (self.ent_keywords, self.ent_min_price, self.ent_max_price, self.ent_interval,
+                  self.ent_gemini_key, self.ent_gemini_model, self.ent_discount):
             w.configure(state="normal")
 
     def _force_check(self):
@@ -606,6 +816,32 @@ class KworkMonitorApp(tk.Tk):
             messagebox.showinfo("Экспорт", f"Файл сохранён:\n{path}")
         except Exception as e:
             messagebox.showerror("Ошибка", f"Не удалось сохранить файл:\n{e}")
+
+    def _generate_proposal_ai(self):
+        pid = self._get_selected_pid()
+        if not pid or pid not in self.projects_db:
+            messagebox.showinfo("Инфо", "Выберите проект из таблицы.")
+            return
+
+        project = self.projects_db[pid]
+
+        key = self.ent_gemini_key.get().strip()
+        if not key:
+            messagebox.showerror("Ошибка", "Пожалуйста, введите Gemini API Key в параметрах приложения.")
+            return
+
+        model = self.ent_gemini_model.get().strip() or "gemini-1.5-flash"
+
+        try:
+            discount_pct = float(self.ent_discount.get().strip() or 30)
+        except ValueError:
+            discount_pct = 30.0
+
+        price = project.get("price", 0)
+        discount_amount = price * (discount_pct / 100.0)
+        calculated_price = max(0, int(price - discount_amount))
+
+        AIGenerationWindow(self, project, calculated_price, key, model)
 
 
 if __name__ == "__main__":
